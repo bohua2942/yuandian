@@ -1,0 +1,93 @@
+name: 每日采集、翻译与更新
+
+on:
+  schedule:
+    - cron: '17 1 * * *' # 每天北京时间 09:17；GitHub 可能延迟触发。
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-content-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: 安装依赖
+        run: |
+          python -m pip install -r requirements.txt
+          npm ci
+      - name: 运行测试
+        run: |
+          python -m unittest discover -s tests -v
+          npm test
+      - name: 采集与翻译（失败来源保留上版）
+        id: collect
+        continue-on-error: true
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+          PRODUCTHUNT_TOKEN: ${{ secrets.PRODUCTHUNT_TOKEN }}
+        run: python scripts/daily.py
+      - name: 检查内容或失败状态是否发生变化
+        id: result
+        run: |
+          if git diff --quiet -- content/catalog.json; then
+            echo 'updated=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'updated=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: 验证生产构建
+        if: steps.result.outputs.updated == 'true'
+        env:
+          NEXT_PUBLIC_SITE_URL: ${{ vars.SITE_URL }}
+        run: npm run build
+      - name: 提交真实内容更新
+        if: steps.result.outputs.updated == 'true'
+        id: commit
+        run: |
+          if git diff --quiet -- content/catalog.json; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add content/catalog.json
+          git commit -m 'content: update daily sources'
+          git push
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+      - name: 触发 Vercel 部署（可选）
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -n "$VERCEL_DEPLOY_HOOK" ]; then
+            curl --fail --silent --show-error --request POST "$VERCEL_DEPLOY_HOOK" > /dev/null
+          fi
+      - name: 保存运行报告（不含密钥与原始模型响应）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-run-report
+          path: data/last-run.json
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: 报告部分或全部失败
+        if: steps.collect.outcome == 'failure'
+        run: |
+          echo '采集或翻译存在失败；成功来源已按构建结果更新，失败来源保留上版。查看 daily-run-report。'
+          exit 1

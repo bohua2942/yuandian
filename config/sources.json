@@ -1,0 +1,11 @@
+{
+  "hnLimit": 30,
+  "phLimit": 30,
+  "aiLimit": 12,
+  "aiMaxAgeHours": 72,
+  "feeds": [
+    { "name": "OpenAI 新闻", "url": "https://openai.com/news/rss.xml" },
+    { "name": "Google AI 博客", "url": "https://blog.google/technology/ai/rss/" },
+    { "name": "Hugging Face 博客", "url": "https://huggingface.co/blog/feed.xml" }
+  ]
+}

@@ -72,7 +72,7 @@ PH 详情还会补采公开产品页的产品结构化介绍与官网入口，�
 本地文件已经具备部署配置，但本次没有替你创建远程仓库或绑定 Vercel 账户。
 
 1. 在自己的 GitHub 账户创建仓库，将本目录源码推送到默认分支 `main`。建议先使用私有仓库。不要上传 `.env.local`、`.venv`、`data` 或 `node_modules`。
-2. 在 Vercel 导入这个仓库。项目使用 `vercel.json` 的构建命令 `npm run build` 与输出目录 `out`；选择 Node.js 22 或更新版本。
+2. 在 Vercel 导入这个仓库，框架选择 Next.js，构建命令为 `npm run build`，输出目录保留框架默认值，不要覆盖为 `out`；选择 Node.js 22 或更新版本。`out` 是 Next.js 生成的静态文件目录，Vercel 的 Next.js 适配器仍需读取 `.next` 中的构建清单。
 3. 先获得 Vercel 分配的域名，设置 Vercel 环境变量 `NEXT_PUBLIC_SITE_URL=https://你的域名`，重新部署。正式域名确定后再替换并重新部署，否则 RSS 和站点地图仍指向本机。
 4. 在 GitHub 仓库 Settings → Secrets and variables → Actions 添加以下配置：
 

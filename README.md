@@ -1,8 +1,8 @@
 # 源点 DAILY
 
-一个参考 DecoHack 阅读布局的独立开发者信息站。包含首页、AI 早报、Hacker News 热榜、Product Hunt 热榜、日期归档、详情、搜索、RSS、深浅色与移动端布局。临时品牌为「源点」，可以再改成你的名称。
+一个参考 DecoHack 阅读布局的独立开发者信息站。包含首页、AI 早报、Hacker News 热榜、Product Hunt 新品、日期归档、详情、搜索、RSS、深浅色与移动端布局。临时品牌为「源点」，可以再改成你的名称。
 
-**目前是可运行的本地项目，尚未部署到线上，也没有激活云端定时任务。** HN 和三个公开 RSS 已实际抓取；首批 42 条真实内容的中文由本次协作整理，详情页标注为初始整理。真实模型翻译与 PH API 仍需填写你自己的密钥后验收。
+**目前是可运行的本地项目，尚未部署到线上，也没有激活云端定时任务。** HN 和三个公开 RSS 已实际抓取；首批中文由本次协作整理，详情页标注为初始整理。2026-10-28 已使用用户本地配置完成 DeepSeek 真实调用及采集、翻译、页面更新；PH 已通过免密钥官方 RSS 接入并翻译 30 款产品，无需申请 token。
 
 ## 先看网站
 
@@ -20,17 +20,23 @@ npm run dev
 
 ## 本地填 API 并真实验收
 
+**有 DeepSeek API 就可以做中文翻译和摘要，不需要另买 OpenAI API。** 本地示例已使用 DeepSeek：地址 `https://api.deepseek.com`，模型 `deepseek-flash`。在 `.env.local` 的 `LLM_API_KEY=` 后填入你的 DeepSeek 密钥即可；不要把密钥发到聊天。接口名称 `LLM` 表示大语言模型，不限定服务商。配置依据：[DeepSeek 官方文档](https://api-docs.deepseek.com/)。
+
+PH 已支持免密钥方案：`PRODUCTHUNT_TOKEN` 留空时自动读取 Product Hunt [官方 RSS](https://help.producthunt.com/en/articles/484970-does-product-hunt-have-an-rss-feed)，获取名称、简介、原始发布时间和 PH 链接。它是订阅快照，不含票数，也不是完整日榜；页面按原始发布时间排序。以后填入 PH token 才切换为含票数的 API 榜单。
+
+PH 详情还会补采公开产品页的产品结构化介绍与官网入口，再由 DeepSeek 完整翻译；列表用一句话简介，详情另显示产品介绍。只接受产品 JSON-LD，不把登录页或通用站点元描述当作产品内容。某次补采失败时保留已有已验证介绍，并标记原资料保存时间；从未取得详细资料的产品明确显示缺口，不让模型凭空扩写。官网与 PH 原文入口放在详情标题下。
+
 1. 双击 **配置API.command**。它会创建并打开本地 `.env.local`，不会覆盖你已经填写的文件。
 2. 填写下表中的配置并保存。密钥只在本机填写，不发到聊天、截图、Git 或笔记网站。
-3. 双击 **验证接入.command**：实际抓取一条 HN 原文、绕过缓存调用一次模型，并测试 PH API。一切就绪时才显示接入通过；该操作不发布内容。
+3. 双击 **验证接入.command**：实际抓取一条 HN 原文、绕过缓存调用一次模型，并测试 PH 官方 RSS（填写 token 时测试 API）。一切就绪时才显示接入通过；该操作不发布内容。
 4. 双击 **更新内容.command**：真实采集、翻译、校验并更新内容库。本地开发预览会刷新。
 
 | 变量 | 如何填写 | 是否必须 |
 | --- | --- | --- |
 | `LLM_API_KEY` | 模型服务商的 API 密钥 | 自动翻译必需 |
-| `LLM_BASE_URL` | OpenAI 兼容接口根地址，包含 `/v1`，不包含 `/chat/completions` | 默认 OpenAI；其他服务商按文档填写 |
-| `LLM_MODEL` | 账户能调用的模型名称，需支持 Chat Completions 和 JSON 输出 | 默认 `gpt-4.1-mini`，可修改 |
-| `PRODUCTHUNT_TOKEN` | Product Hunt Developer Token | PH 栏目必需；其他栏目不需要 |
+| `LLM_BASE_URL` | OpenAI 兼容接口根地址，不包含 `/chat/completions`；DeepSeek 为 `https://api.deepseek.com` | 本地示例已填 DeepSeek；其他服务商按文档填写 |
+| `LLM_MODEL` | 账户能调用的模型名称，需支持 Chat Completions 和 JSON 输出 | 本地示例已填 `deepseek-flash` |
+| `PRODUCTHUNT_TOKEN` | 可选的 Product Hunt Developer Token | 留空即可使用官方 RSS；需要含票数的 API 榜单时再填 |
 | `NEXT_PUBLIC_SITE_URL` | 正式网站的完整 HTTPS 地址 | 正式部署必填，用于 RSS 和站点地图 |
 
 获取 PH token：[官方 API 文档](https://api.producthunt.com/v2/docs)。官方文档目前限制商业用途，经营网站前需确认相应授权。
@@ -41,7 +47,7 @@ npm run dev
 
 ```text
 每天北京时间 09:17（GitHub Actions，触发可能延迟）
-    → HN 官方 API / PH 官方 API / 配置的 RSS
+    → HN 官方 API / PH 官方 RSS（可选 API）/ 配置的 AI RSS
     → 清洗、去重、保留来源与时间
     → 相同原文复用翻译，新内容调用模型
     → 校验中文、条数与来源 ID
@@ -51,14 +57,14 @@ npm run dev
     → Vercel 部署，新内容上线
 ```
 
-- PH：采集前一个完整 UTC 日，页面标注该数据日期。
+- PH：无 token 时读取官方 RSS 的当前快照，取订阅源中原始发布时间最新的 30 款，不生成票数；页面日期为采集日，详情保留原始发布时间。配置 token 后采集前一个完整 UTC 日的 API 榜单，页面标注该数据日期。不会把 RSS 当作前一日完整票数榜单。
 - HN：采集运行时的热榜快照，按官方排名保留顺序，不冒充全天最终榜单。
 - AI 早报：读取近 72 小时的条目，合并去重、按发布时间倒序，最多 12 条；没有内容时保留上期。
 - AI 来源是 OpenAI 新闻、Google AI 博客、Hugging Face 博客。HF 包含社区作者，不能把每篇都称为平台官方发布。
 - 每个栏目显示自己的最后成功内容日期。不会因为今天跑了任务，就把旧内容标成今天的新内容。
 - 某栏目失败时不写入假产品或虚构摘要，其他成功栏目可以继续更新；工作流最后会标记失败以便发现问题。
 - 即使全部来源失败，也会在构建通过后发布失败状态提示，文章仍保留上版，不把旧文章替换成失败批次。
-- 密钥缺失时不会把英文原文当作完成翻译。缺 PH token 时跳过 PH，报告中明确标记。
+- 模型密钥缺失时不会把英文原文当作完成翻译。PH 不依赖密钥即可采集官方 RSS；显式配置的 API token 失效时报告失败，保留旧内容。
 - 这里实现的是**自动更新模式**，不需要每天人工点发布。周刊为人工编辑栏目，不自动生成整篇周刊。
 
 ## 部署到 GitHub 与 Vercel
@@ -73,9 +79,9 @@ npm run dev
 | 位置 | 名称 | 内容 |
 | --- | --- | --- |
 | Repository secret | `LLM_API_KEY` | 你的模型密钥 |
-| Repository secret | `PRODUCTHUNT_TOKEN` | PH Developer Token |
-| Repository variable | `LLM_BASE_URL` | 模型接口地址；留空使用 OpenAI |
-| Repository variable | `LLM_MODEL` | 模型名；留空使用项目默认值 |
+| Repository secret | `PRODUCTHUNT_TOKEN` | 可选；留空使用官方 RSS，需要 API 榜单时再配 |
+| Repository variable | `LLM_BASE_URL` | DeepSeek 填 `https://api.deepseek.com`；留空时程序回退到 OpenAI，因此使用 DeepSeek 时不要留空 |
+| Repository variable | `LLM_MODEL` | DeepSeek 填 `deepseek-flash`；留空时程序回退到 `gpt-4.1-mini`，因此使用 DeepSeek 时不要留空 |
 | Repository variable | `SITE_URL` | 正式 HTTPS 网址，与 Vercel 的 `NEXT_PUBLIC_SITE_URL` 一致 |
 | Repository secret | `VERCEL_DEPLOY_HOOK` | 建议配置 Vercel Deploy Hook 地址，确保内容更新可明确触发部署 |
 
@@ -143,7 +149,7 @@ npm run build
 
 模型 API 使用 HTTPS（仅本机测试允许 HTTP）。抓取和翻译的上游响应正文不进入错误日志，避免回显凭据；也不会把新闻 HTML 当作页面 HTML 渲染。
 
-失败排查：先看 `data/last-run.json` 或 Actions 的 `daily-run-report`，再运行「验证接入」。PH `skipped` 表示未配置 token；`error` 表示抓取或翻译未通过；`unchanged` 表示没有新内容并保留旧期。不是所有来源失败都会删除内容。
+失败排查：先看 `data/last-run.json` 或 Actions 的 `daily-run-report`，再运行「验证接入」。连接报告中的 PH `rss_ok` 表示免密钥官方 RSS 接入通过；`error` 表示抓取或翻译未通过；`unchanged` 表示没有新内容并保留旧期。失败来源不会删除已发布内容。
 
 回退线上内容：在 GitHub 对最近的 `content: update daily sources` 提交执行 Revert，并重新部署。暂停定时：在 Actions 中禁用「每日采集、翻译与更新」，无需删内容或密钥。
 

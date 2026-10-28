@@ -2,6 +2,7 @@
 import hashlib
 import html
 import json
+import re
 import time
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
@@ -10,6 +11,7 @@ from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 from http.client import HTTPException
 from urllib.error import HTTPError, URLError
+from urllib.parse import urljoin, urlsplit
 from urllib.request import Request, urlopen
 
 from store import canonical_url
@@ -150,6 +152,109 @@ PH_QUERY = """query DailyPosts($start: DateTime!, $end: DateTime!, $limit: Int!)
   }
 }"""
 
+PH_FEED_URL = "https://www.producthunt.com/feed?category=undefined"
+
+
+class ProductPage(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.website = ""
+        self.schemas = []
+        self.schema_text = None
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "a" and attrs.get("data-test") == "visit-website-button":
+            self.website = attrs.get("href", "")
+        if tag == "script" and attrs.get("type") == "application/ld+json":
+            self.schema_text = []
+
+    def handle_data(self, data):
+        if self.schema_text is not None:
+            self.schema_text.append(data)
+
+    def handle_endtag(self, tag):
+        if tag == "script" and self.schema_text is not None:
+            try:
+                self.schemas.append(json.loads("".join(self.schema_text)))
+            except ValueError:
+                pass
+            self.schema_text = None
+
+
+def parse_ph_page(raw, source_url):
+    parser = ProductPage()
+    parser.feed(raw.decode("utf-8", errors="replace"))
+    def objects(value):
+        if isinstance(value, list):
+            for child in value:
+                yield from objects(child)
+        elif isinstance(value, dict):
+            yield value
+            yield from objects(value.get("@graph", []))
+    description = ""
+    for schema in parser.schemas:
+        for obj in objects(schema):
+            if obj.get("@type") in ("Product", "SoftwareApplication", "WebApplication") and isinstance(obj.get("description"), str):
+                description = obj["description"]
+    result = {"description": plain_text(description)} if description else {}
+    if parser.website:
+        try:
+            result["websiteUrl"] = canonical_url(urljoin(source_url, parser.website))
+        except ValueError:
+            pass
+    if result:
+        result["detailSourceUrl"] = canonical_url(source_url)
+    return result
+
+
+def enrich_ph_product(entry):
+    if urlsplit(entry["url"]).hostname not in ("www.producthunt.com", "producthunt.com"):
+        return entry
+    try:
+        details = parse_ph_page(request_bytes(entry["url"]), entry["url"])
+        if details:
+            details.update(detailStatus="available", detailFetchedAt=datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"))
+        return {**entry, **details}
+    except (RuntimeError, ValueError, TypeError):
+        # A missing public detail page must not erase a valid feed item.
+        return entry
+
+
+def parse_ph_feed(raw):
+    atom = "{http://www.w3.org/2005/Atom}"
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError:
+        raise ValueError("PH 订阅 XML 不完整或无法解析") from None
+    if root.tag != f"{atom}feed":
+        raise ValueError("PH 订阅入口没有返回 Atom 内容")
+    result, seen = [], set()
+    for entry in root.findall(f"{atom}entry"):
+        title = plain_text(entry.findtext(f"{atom}title") or "")
+        published = iso_date(entry.findtext(f"{atom}published"))
+        links = entry.findall(f"{atom}link")
+        link = next((node.attrib.get("href", "") for node in links if node.attrib.get("rel", "alternate") == "alternate"), "")
+        try:
+            url = canonical_url(link)
+        except ValueError:
+            continue
+        if not title or not published:
+            continue
+        post_id = re.search(r"Post/(\d+)$", entry.findtext(f"{atom}id") or "")
+        source_id = "ph-" + (post_id.group(1) if post_id else hashlib.sha256(url.encode()).hexdigest()[:16])
+        if source_id in seen:
+            continue
+        seen.add(source_id)
+        content = entry.findtext(f"{atom}content") or entry.findtext(f"{atom}summary") or ""
+        # The official feed's first paragraph is the tagline; later paragraphs are navigation.
+        tagline = plain_text(re.split(r"</p\s*>", content, maxsplit=1, flags=re.IGNORECASE)[0])
+        result.append({
+            "sourceId": source_id, "channel": "ph", "title": title, "summary": tagline,
+            "url": url, "discussionUrl": url, "source": "Product Hunt RSS", "publishedAt": published,
+        })
+    return result
+
 
 def parse_ph(payload):
     if payload.get("errors"):
@@ -161,7 +266,9 @@ def parse_ph(payload):
     for entry in nodes:
         result.append({
             "sourceId": f"ph-{entry['id']}", "channel": "ph", "title": entry["name"] + " — " + entry.get("tagline", ""),
-            "summary": entry.get("description", ""), "url": canonical_url(entry.get("website") or entry["url"]),
+            "summary": entry.get("tagline", ""), "description": entry.get("description", ""),
+            "url": canonical_url(entry.get("website") or entry["url"]), "websiteUrl": canonical_url(entry.get("website") or entry["url"]),
+            "detailSourceUrl": canonical_url(entry["url"]),
             "discussionUrl": canonical_url(entry["url"]), "source": "Product Hunt",
             "score": entry.get("votesCount", 0), "publishedAt": entry["createdAt"],
             "image": (entry.get("thumbnail") or {}).get("url"),
@@ -171,7 +278,10 @@ def parse_ph(payload):
 
 def collect_ph(day, token, limit=30):
     if not token:
-        raise ValueError("未配置 PRODUCTHUNT_TOKEN，保留上期 PH 内容")
+        entries = parse_ph_feed(request_bytes(PH_FEED_URL))
+        selected = sorted(entries, key=lambda entry: entry["publishedAt"], reverse=True)[:limit]
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            return list(pool.map(enrich_ph_product, selected))
     start = datetime.fromisoformat(day).replace(tzinfo=timezone.utc)
     payload = request_json("https://api.producthunt.com/v2/api/graphql", headers={"Authorization": f"Bearer {token}"}, payload={
         "query": PH_QUERY,

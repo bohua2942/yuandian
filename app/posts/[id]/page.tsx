@@ -18,5 +18,32 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
   const story = catalog.items.find(entry => entry.id === id);
   if (!story) notFound();
   const definition = channels.find(channel => channel.id === story.channel)!;
-  return <div className="page-container home-layout"><article className="main-column article-column"><Link href={`/${story.channel}/`} className="back-link"><ArrowLeft size={14} />返回{definition.name}</Link><div className="article-header"><div className="article-eyebrow"><span className={`channel-mark mark-${story.channel}`}>{definition.mark}</span><span className="mono">{definition.english}</span><span>{story.date}</span></div><h1>{displayTitle(story)}</h1>{story.titleZh && <p className="article-original-title">{story.title}</p>}<div className="article-stats"><span>{story.source}</span>{story.score !== undefined && <span><ChevronUp size={14} />{story.score} 票</span>}{story.comments !== undefined && <span><MessageCircle size={14} />{story.comments} 条讨论</span>}</div></div><div className="article-body"><div className="article-summary"><span className="card-eyebrow">内容摘要</span><p>{displaySummary(story) || "来源未提供摘要，可以打开原文继续阅读。"}</p></div>{story.tags?.length ? <div className="article-tags">{story.tags.map(tag => <span key={tag}># {tag}</span>)}</div> : null}<div className="article-source"><Link2 size={17} /><div><strong>从一手来源，继续探索。</strong><span>{domain(story.url)} · 发布于 {chineseTime(story.publishedAt)}</span></div><a href={story.url} target="_blank" rel="noopener noreferrer">阅读原文<ArrowUpRight size={15} /></a></div>{story.discussionUrl && story.discussionUrl !== story.url && <a className="discussion-link" href={story.discussionUrl} target="_blank" rel="noopener noreferrer">查看 {story.source} 上的讨论<ArrowUpRight size={14} /></a>}<div className="translation-note">{story.translationStatus === "translated" ? "中文内容由 AI 基于来源标题及摘要整理，重要信息请以原文为准。" : story.translationStatus === "editorial" ? "首批中文内容在项目初始化时整理，保留原始标题与链接；后续内容由每日翻译任务生成。" : "当前为采集到的英文原文，尚未完成中文翻译。"}<br />整理时间：{chineseTime(story.collectedAt)}（北京时间）</div></div></article><Sidebar /></div>;
+  const product = story.channel === "ph";
+  const website = story.websiteUrl && domain(story.websiteUrl) !== "producthunt.com" ? story.websiteUrl : undefined;
+  const origin = story.detailSourceUrl || story.discussionUrl || story.url;
+  const description = story.descriptionZh || story.description;
+  return <div className="page-container home-layout">
+    <article className="main-column article-column">
+      <Link href={`/${story.channel}/`} className="back-link"><ArrowLeft size={14} />返回{definition.name}</Link>
+      <div className="article-header">
+        <div className="article-eyebrow"><span className={`channel-mark mark-${story.channel}`}>{definition.mark}</span><span className="mono">{definition.english}</span><span>{story.date}</span></div>
+        <h1>{displayTitle(story)}</h1>
+        {story.titleZh && story.titleZh !== story.title && <p className="article-original-title">{story.title}</p>}
+        <div className="article-stats"><span>{story.source}</span>{story.score !== undefined && <span><ChevronUp size={14} />{story.score} 票</span>}{story.comments !== undefined && <span><MessageCircle size={14} />{story.comments} 条讨论</span>}</div>
+        <div className="article-actions">
+          {product && website && <a className="primary-link" href={website} target="_blank" rel="noopener noreferrer">访问官网<ArrowUpRight size={16} /></a>}
+          <a className={product && website ? "secondary-link" : "primary-link"} href={product ? origin : story.url} target="_blank" rel="noopener noreferrer">{product ? "查看 PH 原文" : "阅读原文"}<ArrowUpRight size={16} /></a>
+        </div>
+      </div>
+      <div className="article-body">
+        <div className="article-summary"><span className="card-eyebrow">{product ? "一句话了解" : "内容摘要"}</span><p>{displaySummary(story) || "来源未提供摘要，可以打开原文继续阅读。"}</p></div>
+        {product && (description ? <section className="article-description"><h2>产品介绍</h2>{description.split(/\n+/).filter(Boolean).map((paragraph, index) => <p key={index}>{paragraph}</p>)}{story.detailStatus === "cached" && <div className="article-detail-note">本次未取得新的介绍，保留{story.detailFetchedAt ? ` ${chineseTime(story.detailFetchedAt)} 保存的` : "已有的"}资料。</div>}<a href={story.detailSourceUrl || origin} target="_blank" rel="noopener noreferrer">介绍来源<ArrowUpRight size={12} /></a></section> : <p className="article-detail-note">这个产品目前只收录到一句简介。可以通过上方链接查看官网或 PH 原文，继续了解。</p>)}
+        {story.tags?.length ? <div className="article-tags">{story.tags.map(tag => <span key={tag}># {tag}</span>)}</div> : null}
+        <div className="article-source"><Link2 size={17} /><div><strong>从一手来源，继续探索。</strong><span>{domain(product ? origin : story.url)} · 发布于 {chineseTime(story.publishedAt)}</span></div><a href={product ? origin : story.url} target="_blank" rel="noopener noreferrer">阅读原文<ArrowUpRight size={15} /></a></div>
+        {!product && story.discussionUrl && story.discussionUrl !== story.url && <a className="discussion-link" href={story.discussionUrl} target="_blank" rel="noopener noreferrer">查看 {story.source} 上的讨论<ArrowUpRight size={14} /></a>}
+        <div className="translation-note">{story.translationStatus === "translated" ? "中文内容由 AI 基于来源资料翻译整理，重要信息请以原文为准。" : story.translationStatus === "editorial" ? "首批中文内容在项目初始化时整理，保留原始标题与链接；后续内容由每日翻译任务生成。" : "当前为采集到的英文原文，尚未完成中文翻译。"}<br />整理时间：{chineseTime(story.collectedAt)}（北京时间）</div>
+      </div>
+    </article>
+    <Sidebar />
+  </div>;
 }

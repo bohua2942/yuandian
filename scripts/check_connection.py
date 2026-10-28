@@ -30,23 +30,25 @@ def main():
         except (RuntimeError, ValueError, OSError, KeyError):
             report["llm"] = "error"
             print("模型：接入未通过。检查 base URL、模型名、密钥权限及 JSON 输出支持。")
-    if not os.environ.get("PRODUCTHUNT_TOKEN"):
-        print("PH：待填写 PRODUCTHUNT_TOKEN（HN 和 RSS 无需此密钥）")
-    else:
-        try:
-            day = (now.date() - timedelta(days=1)).isoformat()
-            items = collect_ph(day, os.environ["PRODUCTHUNT_TOKEN"], 1)
-            if not items:
-                raise ValueError("empty PH response")
+    try:
+        token = os.environ.get("PRODUCTHUNT_TOKEN", "")
+        day = (now.date() - timedelta(days=1)).isoformat()
+        items = collect_ph(day, token, 1)
+        if not items:
+            raise ValueError("empty PH response")
+        if token:
             report["ph"] = "ok"
             print(f"PH：真实 {day} API 请求通过")
-            print("本次产品：" + items[0]["title"])
-        except (RuntimeError, ValueError, OSError, KeyError):
-            report["ph"] = "error"
-            print("PH：接入未通过。检查 Developer Token、权限及网络连接。")
+        else:
+            report["ph"] = "rss_ok"
+            print("PH：官方 RSS 接入通过，无需密钥（不含票数）")
+        print("本次产品：" + items[0]["title"])
+    except (RuntimeError, ValueError, OSError, KeyError):
+        report["ph"] = "error"
+        print("PH：接入未通过。请检查来源连接；使用 API 模式时还需检查 token。")
     write_json(ROOT / "data/connection-report.json", report)
     print("报告：data/connection-report.json；未更新公开内容。")
-    return 0 if report["llm"] == report["ph"] == "ok" else 1
+    return 0 if report["llm"] == "ok" and report["ph"] in ("ok", "rss_ok") else 1
 
 
 if __name__ == "__main__":

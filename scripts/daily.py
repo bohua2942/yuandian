@@ -56,13 +56,7 @@ def main():
     reports, collected = {}, {}
     selected = list(dict.fromkeys(args.source or ["hn", "ai", "ph"]))
     for channel in selected:
-        day = ph_day if channel == "ph" else today
-        if channel == "ph" and not os.environ.get("PRODUCTHUNT_TOKEN"):
-            reports[channel] = {"state": "skipped", "checkedAt": timestamp, "message": "待配置 PRODUCTHUNT_TOKEN", "count": 0}
-            if not args.collect_only:
-                catalog["status"][channel] = {**catalog["status"].get(channel, {}), **reports[channel]}
-            print(f"{channel}: skipped（未配置 API token）")
-            continue
+        day = ph_day if channel == "ph" and os.environ.get("PRODUCTHUNT_TOKEN") else today
         def collect_and_save(channel=channel):
             entries = collectors[channel]()
             collected[channel] = {"date": day, "collectedAt": timestamp, "items": entries}

@@ -2,6 +2,8 @@ export type Channel = "ph" | "hn" | "ai" | "weekly";
 export type Story = {
   id: string; sourceId: string; channel: Channel; date: string;
   title: string; titleZh?: string; summary: string; summaryZh?: string;
+  description?: string; descriptionZh?: string; websiteUrl?: string; detailSourceUrl?: string;
+  detailStatus?: "available" | "cached"; detailFetchedAt?: string;
   url: string; discussionUrl?: string; image?: string; source: string;
   publishedAt: string; collectedAt: string; score?: number; comments?: number;
   tags?: string[]; translationStatus: "translated" | "original" | "editorial";
@@ -11,7 +13,7 @@ export type SourceStatus = { state: string; checkedAt: string; lastSuccessAt?: s
 export type Catalog = { version: number; updatedAt: string | null; items: Story[]; batches: Batch[]; status: Partial<Record<Channel, SourceStatus>> };
 
 export const channels: { id: Channel; name: string; short: string; english: string; description: string; mark: string }[] = [
-  { id: "ph", name: "PH 热榜", short: "新品", english: "PRODUCT HUNT", description: "发现刚刚诞生的产品，看看创造者正在解决什么问题。", mark: "P" },
+  { id: "ph", name: "PH 新品", short: "新品", english: "PRODUCT HUNT", description: "从 Product Hunt 发现新产品，看看创造者正在解决什么问题。", mark: "P" },
   { id: "ai", name: "AI 早报", short: "早报", english: "AI DAILY", description: "从一手来源出发，读懂 AI 领域值得关注的新进展。", mark: "✳" },
   { id: "hn", name: "HN 热榜", short: "讨论", english: "HACKER NEWS", description: "开发者社区正在讨论什么？保留热度，也保留原文。", mark: "Y" },
   { id: "weekly", name: "独立周刊", short: "周刊", english: "INDIE WEEKLY", description: "慢一点阅读。每周整理值得留下的工具、想法和实践。", mark: "↗" },

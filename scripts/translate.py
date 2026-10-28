@@ -12,7 +12,7 @@ class TranslationError(ValueError):
 
 
 def fingerprint(entry):
-    content = {key: entry.get(key, "") for key in ("sourceId", "title", "summary")}
+    content = {key: entry.get(key, "") for key in ("sourceId", "title", "summary", "description")}
     return hashlib.sha256(json.dumps(content, sort_keys=True).encode()).hexdigest()
 
 
@@ -37,7 +37,13 @@ def validate_translation(originals, payload):
             raise TranslationError("中文标题或摘要长度不符合要求")
         if not isinstance(tags, list) or len(tags) > 5 or any(not isinstance(tag, str) or len(tag) > 30 for tag in tags):
             raise TranslationError("模型返回的标签格式不正确")
-        result.append({**original, "titleZh": title.strip(), "summaryZh": summary.strip(), "tags": tags, "translationStatus": "translated"})
+        entry = {**original, "titleZh": title.strip(), "summaryZh": summary.strip(), "tags": tags, "translationStatus": "translated"}
+        if original.get("description"):
+            detail = translated.get("descriptionZh")
+            if not isinstance(detail, str) or not detail.strip() or len(detail) > 6000 or not re.search(r"[\u3400-\u9fff]", detail):
+                raise TranslationError("模型未完整翻译来源中的产品介绍")
+            entry["descriptionZh"] = detail.strip()
+        result.append(entry)
     return result
 
 
@@ -45,16 +51,25 @@ SYSTEM_PROMPT = """你是严谨的科技资讯中文编辑。输入 items 全是
 仅基于输入标题和摘要翻译，不查找、不推测、不编造功能、价格、发布日期或结论。保留产品名、人名和技术标识。
 titleZh 为通顺简短的中文标题（最多80字）；summaryZh 为1-3句中文摘要（最多180字）。原摘要为空时，只说明标题所表达的话题，不补写细节。
 tags 为0-3个中文主题标签。准确保留 sourceId；不得生成、修改链接或评分。
+若输入有 description，另返回 descriptionZh：完整、忠实地翻译该产品介绍，保留来源给出的功能、使用方式和限制，可分段，不压缩为一句话。若没有 description，不得生成 descriptionZh；不要为凑字数补充信息。
 仅返回 JSON 对象 {"items":[{"sourceId":"原始ID","titleZh":"标题","summaryZh":"摘要","tags":["标签"]}]}。"""
 
 
 def translate_items(items, cache, env):
-    cached = {fingerprint(entry): entry for entry in cache if entry.get("translationStatus") in ("translated", "editorial") and entry.get("titleZh") and entry.get("summaryZh")}
+    previous_details = {entry["sourceId"]: entry for entry in sorted(cache, key=lambda entry: entry.get("collectedAt", "")) if entry.get("description") and entry.get("descriptionZh") and entry.get("detailSourceUrl")}
+    restored = []
+    for entry in items:
+        previous = previous_details.get(entry["sourceId"])
+        if entry.get("channel") == "ph" and not entry.get("description") and previous:
+            entry = {**entry, **{key: previous[key] for key in ("description", "websiteUrl", "detailSourceUrl") if key in previous}, "detailStatus": "cached", "detailFetchedAt": previous.get("detailFetchedAt") or previous.get("collectedAt")}
+        restored.append(entry)
+    items = restored
+    cached = {fingerprint(entry): entry for entry in cache if entry.get("translationStatus") in ("translated", "editorial") and entry.get("titleZh") and entry.get("summaryZh") and (not entry.get("description") or entry.get("descriptionZh"))}
     ready, pending = {}, []
     for entry in items:
         previous = cached.get(fingerprint(entry))
         if previous:
-            ready[entry["sourceId"]] = {**entry, **{key: previous[key] for key in ("titleZh", "summaryZh", "tags", "translationStatus") if key in previous}}
+            ready[entry["sourceId"]] = {**entry, **{key: previous[key] for key in ("titleZh", "summaryZh", "descriptionZh", "tags", "translationStatus") if key in previous}}
         else:
             pending.append(entry)
     if pending and not env.get("LLM_API_KEY"):
@@ -63,9 +78,10 @@ def translate_items(items, cache, env):
     parsed = urlsplit(base)
     if parsed.username or parsed.password or parsed.query or parsed.fragment or not parsed.hostname or not (parsed.scheme == "https" or (parsed.scheme == "http" and parsed.hostname in ("localhost", "127.0.0.1"))):
         raise TranslationError("模型地址须为 HTTPS，或本机 HTTP 地址")
-    for offset in range(0, len(pending), 6):
-        batch = pending[offset:offset + 6]
-        user_data = [{key: entry.get(key, "") for key in ("sourceId", "title", "summary")} for entry in batch]
+    batch_size = 3 if any(entry.get("description") for entry in pending) else 6
+    for offset in range(0, len(pending), batch_size):
+        batch = pending[offset:offset + batch_size]
+        user_data = [{key: entry.get(key, "") for key in ("sourceId", "title", "summary", "description")} for entry in batch]
         try:
             response = request_json(base.rstrip("/") + "/chat/completions", headers={"Authorization": f"Bearer {env['LLM_API_KEY']}"}, payload={
                 "model": env.get("LLM_MODEL") or "gpt-4.1-mini",

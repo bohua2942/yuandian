@@ -35,10 +35,14 @@ def merge_batch(catalog, channel, date, items, now):
         seen.add(source_id)
         public = {key: value for key, value in entry.items() if key in (
             "sourceId", "channel", "title", "titleZh", "summary", "summaryZh", "url", "discussionUrl",
-            "source", "publishedAt", "score", "comments", "image", "tags", "translationStatus")}
+            "source", "publishedAt", "score", "comments", "image", "tags", "translationStatus",
+            "description", "descriptionZh", "websiteUrl", "detailSourceUrl", "detailStatus", "detailFetchedAt")}
         public["url"] = canonical_url(entry["url"])
         if public.get("discussionUrl"):
             public["discussionUrl"] = canonical_url(public["discussionUrl"])
+        for key in ("websiteUrl", "detailSourceUrl"):
+            if public.get(key):
+                public[key] = canonical_url(public[key])
         public.update(id=f"{source_id}-{date}", date=date, collectedAt=now)
         prepared.append(public)
     result = copy.deepcopy(catalog)

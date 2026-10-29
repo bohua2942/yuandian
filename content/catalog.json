@@ -1686,22 +1686,25 @@
   ],
   "status": {
     "hn": {
-      "state": "ok",
-      "checkedAt": "2026-10-28T13:05:29Z",
+      "state": "error",
+      "checkedAt": "2026-10-29T07:09:38Z",
       "lastSuccessAt": "2026-10-28T13:05:29Z",
-      "message": "已更新 30 条"
+      "message": "采集或翻译失败，保留上次成功内容；请检查配置和来源连接",
+      "count": 0
     },
     "ai": {
-      "state": "ok",
-      "checkedAt": "2026-10-28T13:05:29Z",
+      "state": "error",
+      "checkedAt": "2026-10-29T07:09:38Z",
       "lastSuccessAt": "2026-10-28T13:05:29Z",
-      "message": "已更新 12 条"
+      "message": "采集或翻译失败，保留上次成功内容；请检查配置和来源连接",
+      "count": 0
     },
     "ph": {
-      "state": "ok",
-      "checkedAt": "2026-10-28T13:30:41Z",
+      "state": "error",
+      "checkedAt": "2026-10-29T07:09:38Z",
       "lastSuccessAt": "2026-10-28T13:30:41Z",
-      "message": "已更新 30 条"
+      "message": "采集或翻译失败，保留上次成功内容；请检查配置和来源连接",
+      "count": 0
     }
   }
 }

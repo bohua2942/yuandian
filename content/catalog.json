@@ -1687,21 +1687,21 @@
   "status": {
     "hn": {
       "state": "error",
-      "checkedAt": "2026-10-30T07:11:03Z",
+      "checkedAt": "2026-10-31T07:01:52Z",
       "lastSuccessAt": "2026-10-28T13:05:29Z",
       "message": "采集或翻译失败，保留上次成功内容；请检查配置和来源连接",
       "count": 0
     },
     "ai": {
       "state": "error",
-      "checkedAt": "2026-10-30T07:11:03Z",
+      "checkedAt": "2026-10-31T07:01:52Z",
       "lastSuccessAt": "2026-10-28T13:05:29Z",
       "message": "采集或翻译失败，保留上次成功内容；请检查配置和来源连接",
       "count": 0
     },
     "ph": {
       "state": "error",
-      "checkedAt": "2026-10-30T07:11:03Z",
+      "checkedAt": "2026-10-31T07:01:52Z",
       "lastSuccessAt": "2026-10-28T13:30:41Z",
       "message": "采集或翻译失败，保留上次成功内容；请检查配置和来源连接",
       "count": 0

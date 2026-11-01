@@ -5,6 +5,7 @@ import { SearchDialog } from "@/components/search";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  verification: { google: "FDBhqHzNGIqDcuRWbjfMHIzgWYXL1wxeNk881V8Ohek" },
   metadataBase: new URL(site.url), title: { default: `${site.name} DAILY · 独立开发者的每日信息`, template: `%s · ${site.name} DAILY` },
   description: site.description, alternates: { types: { "application/rss+xml": "/feed.xml" } }, icons: { icon: "/icon.svg" },
 };
